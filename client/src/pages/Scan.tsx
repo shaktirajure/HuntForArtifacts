@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Camera, Gem, Scroll, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Camera, Gem, Scroll, AlertCircle, Info, QrCode } from "lucide-react";
 import { useLocation } from "wouter";
 import jsQR from "jsqr";
 
@@ -156,43 +157,51 @@ const Scan = () => {
       {/* Scanner Interface */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="aspect-square max-w-md mx-auto bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative overflow-hidden">
-            {!isScanning && !error && (
-              <div className="text-center">
-                <Camera className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
-                <p className="text-muted-foreground mb-4" data-testid="text-camera-placeholder">
-                  Camera will appear here
-                </p>
-                <Button
-                  onClick={handleStartCamera}
-                  data-testid="button-enable-camera"
-                >
-                  Enable Camera
-                </Button>
-              </div>
-            )}
-            
-            {error && (
-              <div className="text-center p-4">
-                <AlertCircle className="h-16 w-16 text-destructive mb-4 mx-auto" />
-                <p className="text-destructive mb-4" data-testid="text-camera-error">
-                  {error}
-                </p>
-                <Button
-                  onClick={handleRetry}
-                  variant="destructive"
-                  data-testid="button-retry-camera"
-                >
-                  Tap to Retry
-                </Button>
-              </div>
-            )}
-            
-            {isScanning && (
-              <>
+          {!isScanning && !error && (
+            <div className="text-center py-12">
+              <QrCode className="h-24 w-24 text-primary mb-6 mx-auto" />
+              <h3 className="text-xl font-semibold mb-4">Ready to Scan</h3>
+              <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+                Tap the button below to start your camera and scan QR codes to discover amazing artifacts
+              </p>
+              <Button
+                onClick={handleStartCamera}
+                size="lg"
+                className="text-lg px-8 py-4 h-auto"
+                data-testid="button-start-scanner"
+              >
+                <Camera className="mr-3 h-6 w-6" />
+                Start Scanner
+              </Button>
+            </div>
+          )}
+          
+          {error && (
+            <div className="text-center py-12">
+              <AlertCircle className="h-16 w-16 text-destructive mb-4 mx-auto" />
+              <h3 className="text-lg font-semibold mb-2">Camera Access Required</h3>
+              <p className="text-destructive mb-6" data-testid="text-camera-error">
+                {error}
+              </p>
+              <Button
+                onClick={handleRetry}
+                variant="destructive"
+                size="lg"
+                className="px-8 py-3"
+                data-testid="button-retry-camera"
+              >
+                Tap to Retry
+              </Button>
+            </div>
+          )}
+          
+          {isScanning && (
+            <div className="relative">
+              {/* Live Video Preview */}
+              <div className="aspect-video max-w-2xl mx-auto bg-black rounded-lg overflow-hidden relative">
                 <video
                   ref={videoRef}
-                  className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                  className="w-full h-full object-cover"
                   autoPlay
                   playsInline
                   muted
@@ -204,24 +213,65 @@ const Scan = () => {
                 />
                 {/* Scanning overlay */}
                 <div className="absolute inset-4 border-2 border-accent rounded-lg pointer-events-none">
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-accent"></div>
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-accent"></div>
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-accent"></div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-accent"></div>
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-accent"></div>
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-accent"></div>
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-accent"></div>
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-accent"></div>
                 </div>
-                {/* Stop button */}
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                  <Button
-                    onClick={stopCamera}
-                    variant="secondary"
-                    size="sm"
-                    data-testid="button-stop-camera"
-                  >
-                    Stop Camera
-                  </Button>
+                {/* Scanning status */}
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-background/90 px-4 py-2 rounded-full">
+                  <div className="flex items-center text-sm">
+                    <div className="w-2 h-2 bg-accent rounded-full animate-pulse mr-2"></div>
+                    Scanning for QR codes...
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+              
+              {/* Control buttons */}
+              <div className="text-center mt-6">
+                <Button
+                  onClick={stopCamera}
+                  variant="secondary"
+                  size="lg"
+                  className="px-8 py-3"
+                  data-testid="button-stop-camera"
+                >
+                  Stop Camera
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Camera Permissions Info */}
+      <Card className="mb-6 bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+        <CardContent className="p-4">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                Camera Permissions Required
+              </div>
+              <p className="text-blue-700 dark:text-blue-300 mb-2">
+                This app needs access to your camera to scan QR codes. Please allow camera permissions when prompted.
+              </p>
+              <div className="flex items-center space-x-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="link" size="sm" className="text-blue-600 dark:text-blue-400 p-0 h-auto">
+                      Mobile Testing Notes
+                      <Info className="ml-1 h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      Camera access requires HTTPS on mobile devices. For testing, use the Replit preview URL or access via localhost on your development machine.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
