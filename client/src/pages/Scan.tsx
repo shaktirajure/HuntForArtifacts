@@ -1,26 +1,131 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Camera, Gem, Scroll } from "lucide-react";
+import { Camera, Gem, Scroll, AlertCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import jsQR from "jsqr";
 
 const Scan = () => {
   const [manualCode, setManualCode] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [error, setError] = useState<string>("");
+  const [, setLocation] = useLocation();
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const animationRef = useRef<number>();
 
-  const handleStartCamera = () => {
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    setIsScanning(false);
+  }, []);
+
+  const scanFrame = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (!video || !canvas || !isScanning) return;
+    
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+      
+      if (qrCode) {
+        const url = qrCode.data;
+        try {
+          const urlParts = url.split('/');
+          const slug = urlParts[urlParts.length - 1];
+          if (slug) {
+            stopCamera();
+            setLocation(`/artifacts/${slug}`);
+            return;
+          }
+        } catch (err) {
+          console.error('Error parsing QR code URL:', err);
+        }
+      }
+    }
+    
+    animationRef.current = requestAnimationFrame(scanFrame);
+  }, [isScanning, stopCamera, setLocation]);
+
+  const handleStartCamera = async () => {
+    setError("");
     setIsScanning(true);
-    // TODO: Implement camera QR code scanning
-    setTimeout(() => setIsScanning(false), 3000);
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        scanFrame();
+      }
+    } catch (err) {
+      console.error('Camera access error:', err);
+      setIsScanning(false);
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError') {
+          setError("Camera access denied. Please allow camera permissions and try again.");
+        } else if (err.name === 'NotFoundError') {
+          setError("No camera found on this device.");
+        } else {
+          setError("Failed to access camera. Please try again.");
+        }
+      } else {
+        setError("Failed to access camera. Please try again.");
+      }
+    }
+  };
+
+  const handleRetry = () => {
+    setError("");
+    handleStartCamera();
   };
 
   const handleSubmitManualCode = () => {
     if (manualCode.trim()) {
-      // TODO: Process manual code entry
-      console.log("Processing code:", manualCode);
-      setManualCode("");
+      try {
+        const urlParts = manualCode.trim().split('/');
+        const slug = urlParts[urlParts.length - 1];
+        if (slug) {
+          setLocation(`/artifacts/${slug}`);
+          setManualCode("");
+        }
+      } catch (err) {
+        console.error('Error processing manual code:', err);
+      }
     }
   };
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const recentScans = [
     {
@@ -51,25 +156,71 @@ const Scan = () => {
       {/* Scanner Interface */}
       <Card className="mb-6">
         <CardContent className="p-6">
-          <div className="aspect-square max-w-md mx-auto bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative">
-            <div className="text-center">
-              <Camera className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
-              <p className="text-muted-foreground mb-4" data-testid="text-camera-placeholder">
-                Camera will appear here
-              </p>
-              <Button
-                onClick={handleStartCamera}
-                disabled={isScanning}
-                data-testid="button-enable-camera"
-              >
-                {isScanning ? "Scanning..." : "Enable Camera"}
-              </Button>
-            </div>
+          <div className="aspect-square max-w-md mx-auto bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center relative overflow-hidden">
+            {!isScanning && !error && (
+              <div className="text-center">
+                <Camera className="h-16 w-16 text-muted-foreground mb-4 mx-auto" />
+                <p className="text-muted-foreground mb-4" data-testid="text-camera-placeholder">
+                  Camera will appear here
+                </p>
+                <Button
+                  onClick={handleStartCamera}
+                  data-testid="button-enable-camera"
+                >
+                  Enable Camera
+                </Button>
+              </div>
+            )}
             
-            {/* Scanning overlay */}
-            <div className="absolute inset-4 border-2 border-accent rounded-lg opacity-50 pointer-events-none" />
+            {error && (
+              <div className="text-center p-4">
+                <AlertCircle className="h-16 w-16 text-destructive mb-4 mx-auto" />
+                <p className="text-destructive mb-4" data-testid="text-camera-error">
+                  {error}
+                </p>
+                <Button
+                  onClick={handleRetry}
+                  variant="destructive"
+                  data-testid="button-retry-camera"
+                >
+                  Tap to Retry
+                </Button>
+              </div>
+            )}
+            
             {isScanning && (
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+              <>
+                <video
+                  ref={videoRef}
+                  className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                  autoPlay
+                  playsInline
+                  muted
+                  data-testid="video-camera-feed"
+                />
+                <canvas
+                  ref={canvasRef}
+                  className="hidden"
+                />
+                {/* Scanning overlay */}
+                <div className="absolute inset-4 border-2 border-accent rounded-lg pointer-events-none">
+                  <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-accent"></div>
+                  <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-accent"></div>
+                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-accent"></div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-accent"></div>
+                </div>
+                {/* Stop button */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                  <Button
+                    onClick={stopCamera}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="button-stop-camera"
+                  >
+                    Stop Camera
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </CardContent>
