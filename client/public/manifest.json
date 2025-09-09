@@ -1,0 +1,30 @@
+{
+  "name": "Artifact Hunter",
+  "short_name": "ArtifactHunter",
+  "description": "Discover hidden treasures through QR code scanning and treasure hunts",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230f766e'/%3E%3Cpath d='M16 8l-3 6h6l-3-6zm0 16l3-6h-6l3 6z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%230f766e'/%3E%3Cpath d='M96 48l-18 36h36l-18-36zm0 96l18-36h-36l18 36z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f766e'/%3E%3Cpath d='M256 128l-48 96h96l-48-96zm0 256l48-96h-96l48 96z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "entertainment", "education"],
+  "lang": "en",
+  "dir": "ltr"
+}
