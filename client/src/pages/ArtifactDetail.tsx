@@ -1,17 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Award, Share2, CheckCircle, XCircle, HelpCircle, Lightbulb } from "lucide-react";
+import { ArrowLeft, Award, Share2, CheckCircle, XCircle, HelpCircle, Lightbulb, MapPin, Trophy } from "lucide-react";
 import { Link, useParams } from "wouter";
 import { getArtifactBySlug, TriviaQuestion } from "@/data/artifacts";
+import { hunts, getHuntProgress, completeHuntStep, HuntProgress } from "@/data/hunts";
 
 const ArtifactDetail = () => {
   const { slug } = useParams();
   const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: number }>({});
   const [showAnswers, setShowAnswers] = useState<{ [key: number]: boolean }>({});
+  const [huntStepCompleted, setHuntStepCompleted] = useState<string | null>(null);
+  const [nextClue, setNextClue] = useState<string | null>(null);
 
   const artifact = slug ? getArtifactBySlug(slug) : undefined;
+
+  useEffect(() => {
+    if (!artifact) return;
+
+    // Check all active hunts to see if this artifact matches the current step
+    hunts.forEach(hunt => {
+      const progress = getHuntProgress(hunt.id);
+      if (!progress) return;
+
+      // Find the current step
+      const currentStep = hunt.steps.find(step => step.order === progress.currentStep);
+      if (currentStep && currentStep.artifactSlug === artifact.slug) {
+        // This artifact matches the current hunt step!
+        const updatedProgress = completeHuntStep(hunt.id, currentStep.order);
+        if (updatedProgress) {
+          setHuntStepCompleted(hunt.name);
+          
+          // Find the next clue
+          const nextStep = hunt.steps.find(step => step.order === updatedProgress.currentStep);
+          if (nextStep) {
+            setNextClue(nextStep.clue);
+          }
+        }
+      }
+    });
+  }, [artifact]);
 
   if (!artifact) {
     return (
@@ -181,6 +210,49 @@ const ArtifactDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Hunt Step Completion */}
+      {huntStepCompleted && (
+        <Card className="mb-8 bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+          <CardContent className="p-6">
+            <div className="text-center mb-4">
+              <Trophy className="h-12 w-12 text-green-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-green-900 dark:text-green-100 mb-2" data-testid="text-hunt-step-completed">
+                Hunt Step Completed!
+              </h3>
+              <p className="text-green-700 dark:text-green-300" data-testid="text-hunt-name-completed">
+                Great job! You've completed a step in "{huntStepCompleted}".
+              </p>
+            </div>
+            
+            {nextClue && (
+              <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-3">
+                    <MapPin className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        Next Clue
+                      </div>
+                      <p className="text-blue-700 dark:text-blue-300" data-testid="text-next-hunt-clue">
+                        {nextClue}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            <div className="text-center mt-4">
+              <Link href="/hunts">
+                <Button variant="outline" data-testid="button-view-hunt-progress">
+                  View Hunt Progress
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Success Message */}
       <Card className="bg-accent/10 border-accent">
