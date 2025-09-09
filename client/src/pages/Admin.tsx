@@ -1,8 +1,25 @@
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, MapPin, QrCode, TrendingUp, Plus, Settings, BarChart3, UserPlus, Crown, Gem } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Users, MapPin, QrCode, TrendingUp, Plus, Settings, BarChart3, UserPlus, Crown, Gem, Download, Printer, Eye } from "lucide-react";
+import QRCode from "qrcode";
+import { artifacts as initialArtifacts, Artifact } from "@/data/artifacts";
 
 const Admin = () => {
+  const [artifacts, setArtifacts] = useState<Artifact[]>(initialArtifacts);
+  const [newArtifact, setNewArtifact] = useState({
+    slug: "",
+    title: "",
+    summary: "",
+    imageUrl: "",
+  });
+  const [qrCodes, setQrCodes] = useState<{ [slug: string]: string }>({});
+  const [showPrintLayout, setShowPrintLayout] = useState(false);
+  const canvasRefs = useRef<{ [slug: string]: HTMLCanvasElement | null }>({});
+
   const stats = [
     {
       title: "Total Users",
@@ -20,8 +37,8 @@ const Admin = () => {
     },
     {
       title: "Artifacts Scanned",
-      value: "8,934",
-      change: "+145 today",
+      value: artifacts.length.toString(),
+      change: `${artifacts.length - initialArtifacts.length} new artifacts`,
       icon: QrCode,
       color: "bg-secondary",
     },
@@ -34,48 +51,138 @@ const Admin = () => {
     },
   ];
 
-  const artifactActions = [
-    { label: "Add New Artifact", icon: Plus, color: "text-primary" },
-    { label: "Manage Existing Artifacts", icon: Settings, color: "text-secondary" },
-    { label: "Generate QR Codes", icon: QrCode, color: "text-accent" },
-  ];
+  // Generate QR codes for all artifacts
+  useEffect(() => {
+    const generateQRCodes = async () => {
+      const codes: { [slug: string]: string } = {};
+      for (const artifact of artifacts) {
+        try {
+          const qrCodeDataUrl = await QRCode.toDataURL(
+            `${window.location.origin}/artifacts/${artifact.slug}`,
+            {
+              width: 200,
+              margin: 2,
+              color: {
+                dark: '#0f766e',
+                light: '#ffffff'
+              }
+            }
+          );
+          codes[artifact.slug] = qrCodeDataUrl;
+        } catch (error) {
+          console.error('Error generating QR code for', artifact.slug, error);
+        }
+      }
+      setQrCodes(codes);
+    };
 
-  const huntActions = [
-    { label: "Create New Hunt", icon: Plus, color: "text-primary" },
-    { label: "Manage Active Hunts", icon: Settings, color: "text-secondary" },
-    { label: "View Hunt Reports", icon: BarChart3, color: "text-accent" },
-  ];
+    generateQRCodes();
+  }, [artifacts]);
 
-  const recentActivity = [
-    {
-      id: 1,
-      description: "New user registration: john.doe@email.com",
-      timestamp: "2 minutes ago",
-      icon: UserPlus,
-      color: "bg-primary",
-    },
-    {
-      id: 2,
-      description: "Artifact scanned: Ancient Egyptian Vase",
-      timestamp: "5 minutes ago",
-      icon: QrCode,
-      color: "bg-accent",
-    },
-    {
-      id: 3,
-      description: "Hunt completed: Roman Empire Quest",
-      timestamp: "1 hour ago",
-      icon: Crown,
-      color: "bg-secondary",
-    },
-    {
-      id: 4,
-      description: "New artifact added: Viking Battle Axe",
-      timestamp: "3 hours ago",
-      icon: Gem,
-      color: "bg-primary",
-    },
-  ];
+  const handleCreateArtifact = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newArtifact.slug || !newArtifact.title || !newArtifact.summary) {
+      return;
+    }
+
+    const artifact: Artifact = {
+      ...newArtifact,
+      quickFacts: ["Created by admin", "Available for discovery"],
+      trivia: [
+        {
+          question: "What type of artifact is this?",
+          options: ["Historical", "Cultural", "Archaeological", "Artistic"],
+          answerIndex: 0
+        }
+      ]
+    };
+
+    setArtifacts(prev => [...prev, artifact]);
+    setNewArtifact({ slug: "", title: "", summary: "", imageUrl: "" });
+  };
+
+  const downloadQRCode = (slug: string, title: string) => {
+    const qrCodeDataUrl = qrCodes[slug];
+    if (qrCodeDataUrl) {
+      const link = document.createElement('a');
+      link.download = `qr-${slug}.png`;
+      link.href = qrCodeDataUrl;
+      link.click();
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (showPrintLayout) {
+    return (
+      <>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              body { margin: 0; }
+              .print-layout { 
+                width: 210mm; 
+                height: 297mm; 
+                margin: 0; 
+                padding: 10mm;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: 1fr 1fr;
+                gap: 5mm;
+              }
+              .qr-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border: 1px solid #ccc;
+                padding: 5mm;
+                page-break-inside: avoid;
+              }
+              .no-print { display: none !important; }
+            }
+          `
+        }} />
+        <div className="p-4 no-print">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold">Print Layout - 4 QR Codes per Page</h1>
+            <div className="space-x-2">
+              <Button onClick={handlePrint} data-testid="button-print">
+                <Printer className="mr-2 h-4 w-4" />
+                Print
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowPrintLayout(false)}
+                data-testid="button-exit-print"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Exit Print View
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="print-layout">
+          {artifacts.slice(0, 4).map((artifact) => (
+            <div key={artifact.slug} className="qr-item">
+              {qrCodes[artifact.slug] && (
+                <img 
+                  src={qrCodes[artifact.slug]} 
+                  alt={`QR code for ${artifact.title}`}
+                  className="w-32 h-32 mb-2"
+                />
+              )}
+              <h3 className="text-lg font-semibold text-center">{artifact.title}</h3>
+              <p className="text-sm text-center text-gray-600">Scan to discover</p>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -113,87 +220,120 @@ const Admin = () => {
         })}
       </div>
 
-      {/* Admin Actions */}
-      <div className="grid md:grid-cols-2 gap-6 mb-8">
-        {/* Artifact Management */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4" data-testid="text-artifact-management-title">
-              Artifact Management
-            </h3>
-            <div className="space-y-3">
-              {artifactActions.map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="w-full justify-start text-left p-3 h-auto"
-                    data-testid={`button-artifact-${index}`}
-                  >
-                    <Icon className={`mr-3 h-5 w-5 ${action.color}`} />
-                    {action.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Hunt Management */}
-        <Card>
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4" data-testid="text-hunt-management-title">
-              Hunt Management
-            </h3>
-            <div className="space-y-3">
-              {huntActions.map((action, index) => {
-                const Icon = action.icon;
-                return (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="w-full justify-start text-left p-3 h-auto"
-                    data-testid={`button-hunt-${index}`}
-                  >
-                    <Icon className={`mr-3 h-5 w-5 ${action.color}`} />
-                    {action.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card>
+      {/* Create New Artifact */}
+      <Card className="mb-8">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-4" data-testid="text-recent-activity-title">
-            Recent Activity
+          <h3 className="text-lg font-semibold mb-4" data-testid="text-create-artifact-title">
+            Create New Artifact
           </h3>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => {
-              const Icon = activity.icon;
-              return (
-                <div
-                  key={activity.id}
-                  className="flex items-center space-x-4 p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div className={`w-10 h-10 ${activity.color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                    <Icon className="text-white text-sm" />
+          <form onSubmit={handleCreateArtifact} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="slug">Slug</Label>
+                <Input
+                  id="slug"
+                  value={newArtifact.slug}
+                  onChange={(e) => setNewArtifact(prev => ({ ...prev, slug: e.target.value }))}
+                  placeholder="ancient-artifact-name"
+                  required
+                  data-testid="input-artifact-slug"
+                />
+              </div>
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={newArtifact.title}
+                  onChange={(e) => setNewArtifact(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Ancient Artifact Name"
+                  required
+                  data-testid="input-artifact-title"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="imageUrl">Image URL</Label>
+              <Input
+                id="imageUrl"
+                value={newArtifact.imageUrl}
+                onChange={(e) => setNewArtifact(prev => ({ ...prev, imageUrl: e.target.value }))}
+                placeholder="https://images.example.com/artifact.jpg"
+                data-testid="input-artifact-image-url"
+              />
+            </div>
+            <div>
+              <Label htmlFor="summary">Summary</Label>
+              <Textarea
+                id="summary"
+                value={newArtifact.summary}
+                onChange={(e) => setNewArtifact(prev => ({ ...prev, summary: e.target.value }))}
+                placeholder="A detailed description of the artifact..."
+                required
+                data-testid="textarea-artifact-summary"
+              />
+            </div>
+            <Button type="submit" data-testid="button-create-artifact">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Artifact
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Artifacts with QR Codes */}
+      <Card className="mb-8">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-lg font-semibold" data-testid="text-artifacts-qr-title">
+              Artifacts & QR Codes
+            </h3>
+            <Button 
+              onClick={() => setShowPrintLayout(true)}
+              variant="outline"
+              data-testid="button-print-layout"
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Print 4-per-page
+            </Button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {artifacts.map((artifact) => (
+              <Card key={artifact.slug} className="p-4">
+                <div className="text-center">
+                  <h4 className="font-semibold mb-2" data-testid={`text-artifact-title-${artifact.slug}`}>
+                    {artifact.title}
+                  </h4>
+                  <div className="mb-4">
+                    {qrCodes[artifact.slug] ? (
+                      <img 
+                        src={qrCodes[artifact.slug]} 
+                        alt={`QR code for ${artifact.title}`}
+                        className="w-32 h-32 mx-auto border rounded"
+                        data-testid={`img-qr-code-${artifact.slug}`}
+                      />
+                    ) : (
+                      <div className="w-32 h-32 mx-auto bg-muted rounded flex items-center justify-center">
+                        <QrCode className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium" data-testid={`text-activity-description-${activity.id}`}>
-                      {activity.description}
-                    </p>
-                    <p className="text-sm text-muted-foreground" data-testid={`text-activity-timestamp-${activity.id}`}>
-                      {activity.timestamp}
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
+                    {artifact.summary}
+                  </p>
+                  <Button 
+                    onClick={() => downloadQRCode(artifact.slug, artifact.title)}
+                    size="sm"
+                    className="w-full"
+                    disabled={!qrCodes[artifact.slug]}
+                    data-testid={`button-download-qr-${artifact.slug}`}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download PNG
+                  </Button>
                 </div>
-              );
-            })}
+              </Card>
+            ))}
           </div>
         </CardContent>
       </Card>
