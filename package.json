@@ -105,4 +105,13 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   }
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",          // <— only build the client
+    "build: web": "vite build",      // (optional) alt name if you want
+    "preview": "vite preview --port 4173"
+  }
+}
+
 }
